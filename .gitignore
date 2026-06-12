@@ -1,0 +1,22 @@
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+*.egg-info/
+.pytest_cache/
+
+# Spark / Delta local output
+data/lakehouse/
+data/archive/
+metastore_db/
+derby.log
+spark-warehouse/
+
+# IDE / OS
+.vscode/
+.idea/
+.DS_Store
+
+# Secrets — never commit credentials
+.env
+*.secret
