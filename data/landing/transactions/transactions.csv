@@ -1,0 +1,6 @@
+txn_id,customer_id,amount,txn_date,status
+101,1,5000.00,2024-04-01,completed
+102,2,1200.50,2024-04-02,completed
+103,3,8750.00,2024-04-03,pending
+104,1,300.00,2024-04-04,completed
+105,4,9999.99,2024-04-05,failed
