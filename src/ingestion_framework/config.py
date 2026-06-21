@@ -18,11 +18,20 @@ from typing import Optional
 from pyspark.sql import SparkSession
 
 from ingestion_framework.logging_setup import get_logger
+from ingestion_framework.session import WAREHOUSE_DIR
 
 logger = get_logger(__name__)
 
+# Read Delta tables directly by path instead of spark.table(name).
+# This bypasses the Hive metastore entirely — no metastore means no
+# "table not found" errors when running scripts across separate sessions.
+# On Databricks, spark.table() works because the metastore is always running;
+# locally the embedded Derby metastore doesn't persist reliably across sessions.
+CONFIG_TABLE_PATH = f"{WAREHOUSE_DIR}/ingestion_framework.db/config_table"
+AUDIT_TABLE_PATH = f"{WAREHOUSE_DIR}/ingestion_framework.db/audit_table"
+
+# Keep the SQL name for watermark UPDATE (SQL UPDATE needs a registered table)
 CONFIG_TABLE = "ingestion_framework.config_table"
-AUDIT_TABLE = "ingestion_framework.audit_table"
 
 
 # ---------------------------------------------------------------------------
@@ -160,6 +169,16 @@ def _safe(row, key: str, default):
 # Table access functions
 # ---------------------------------------------------------------------------
 
+def _read_config_table(spark: SparkSession):
+    """Read the config Delta table directly from its file path.
+
+    Using spark.read.format("delta").load(path) instead of spark.table(name)
+    means we don't depend on the Hive metastore — the data is always found as
+    long as the files exist on disk.
+    """
+    return spark.read.format("delta").load(CONFIG_TABLE_PATH)
+
+
 def get_config(spark: SparkSession, config_id: int) -> IngestionConfig:
     """Fetch a single config row by ID.
 
@@ -168,7 +187,7 @@ def get_config(spark: SparkSession, config_id: int) -> IngestionConfig:
     pipeline with a confusing AttributeError.
     """
     rows = (
-        spark.table(CONFIG_TABLE)
+        _read_config_table(spark)
         .filter(f"config_id = {config_id}")
         .collect()
     )
@@ -186,7 +205,7 @@ def get_all_active_configs(spark: SparkSession) -> list[IngestionConfig]:
     execution order deterministic — easier to follow in logs.
     """
     rows = (
-        spark.table(CONFIG_TABLE)
+        _read_config_table(spark)
         .filter("is_active = 'Y'")
         .orderBy("config_id")
         .collect()
