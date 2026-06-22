@@ -27,8 +27,9 @@ SAMPLE_CUSTOMERS = """customer_id,name,city,signup_date
 2,Priya Sharma,Delhi,2024-02-15
 3,Arjun Nair,Bangalore,2024-03-20
 4,Sneha Patel,Ahmedabad,2024-01-25
-5,Ravi Kumar,Mumbai,2024-01-10
+1,Ravi Kumar,Mumbai,2024-01-10
 """
+# Note: customer_id=1 appears twice — intentional duplicate to test dedup gate
 
 SAMPLE_TRANSACTIONS = """txn_id,customer_id,amount,txn_date,status
 101,1,5000.00,2024-04-01,completed
