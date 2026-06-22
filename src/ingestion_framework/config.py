@@ -226,15 +226,24 @@ def update_watermark(
     This is the key to automated incremental loading: after each run we store
     the MAX value of the watermark column so the next run picks up from there.
 
-    Uses a SQL UPDATE on the Delta config table — ACID guaranteed.
+    Uses DeltaTable.forPath().update() instead of spark.sql("UPDATE ...") to
+    avoid the Hive metastore dependency — same ACID guarantee, path-based access.
     """
-    set_clause = f"incremental_value_1 = '{new_value_1}'"
-    if new_value_2:
-        set_clause += f", incremental_value_2 = '{new_value_2}'"
+    from delta.tables import DeltaTable
+    from pyspark.sql import functions as F
 
-    spark.sql(f"""
-        UPDATE {CONFIG_TABLE}
-        SET {set_clause}, updated_at = current_timestamp()
-        WHERE config_id = {config_id}
-    """)
+    set_values = {
+        "incremental_value_1": F.lit(new_value_1),
+        "updated_at": F.current_timestamp(),
+    }
+    if new_value_2:
+        set_values["incremental_value_2"] = F.lit(new_value_2)
+
+    (
+        DeltaTable.forPath(spark, CONFIG_TABLE_PATH)
+        .update(
+            condition=F.col("config_id") == config_id,
+            set=set_values,
+        )
+    )
     logger.info("Updated watermark | config_id=%d | new_value_1=%s", config_id, new_value_1)

@@ -22,10 +22,37 @@ from datetime import datetime, date
 from typing import Optional
 
 from pyspark.sql import SparkSession
-from pyspark.sql import functions as F
+from pyspark.sql.types import (
+    StructType, StructField,
+    LongType, StringType, IntegerType, DoubleType,
+    TimestampType, DateType,
+)
 
 from ingestion_framework.config import AUDIT_TABLE_PATH
 from ingestion_framework.logging_setup import get_logger
+
+# Explicit schema — required when any field may be None at creation time.
+# Spark cannot infer a type from None, so we tell it the types explicitly.
+AUDIT_SCHEMA = StructType([
+    StructField("audit_id",          LongType(),      True),
+    StructField("run_id",            StringType(),    False),
+    StructField("batch_id",          StringType(),    False),
+    StructField("config_id",         IntegerType(),   False),
+    StructField("source_system",     StringType(),    True),
+    StructField("source_table",      StringType(),    True),
+    StructField("target_table",      StringType(),    True),
+    StructField("status",            StringType(),    False),
+    StructField("load_type",         StringType(),    True),
+    StructField("source_count",      LongType(),      True),
+    StructField("records_inserted",  LongType(),      True),
+    StructField("rejected_records",  LongType(),      True),
+    StructField("validation_status", StringType(),    True),
+    StructField("error_message",     StringType(),    True),
+    StructField("start_time",        TimestampType(), True),
+    StructField("end_time",          TimestampType(), True),
+    StructField("execution_seconds", DoubleType(),    True),
+    StructField("batch_date",        DateType(),      True),
+])
 
 logger = get_logger(__name__)
 
@@ -95,9 +122,10 @@ def write_audit(
         "batch_date": date.today(),
     }
 
-    # createDataFrame([dict]) creates a one-row DataFrame from a list of dicts.
-    # Spark infers the schema from the dict keys and Python types.
-    audit_df = spark.createDataFrame([record])
+    # Pass the explicit schema as the second argument.
+    # Without it, Spark tries to infer types from Python values — but None
+    # has no type, causing CANNOT_DETERMINE_TYPE on nullable fields.
+    audit_df = spark.createDataFrame([record], schema=AUDIT_SCHEMA)
 
     (
         audit_df.write
